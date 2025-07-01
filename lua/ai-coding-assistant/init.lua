@@ -1,24 +1,22 @@
 -- /lua/ai-coding-assistant/init.lua
-local ui = require("ai-coding-assistant.ui")
-
 local M = {}
 
--- This is the public setup function for our plugin
 function M.setup(opts)
-  -- For now, opts is not used, but it's here for future configuration.
+  --> 1. Pass the user's options to the config module to be processed.
+  local config = require("ai-coding-assistant.config")
+  config.setup(opts)
 
-  -- Create user commands that other people (and you) can use
-  vim.api.nvim_create_user_command(
-    "AISelectModel",
-    ui.model_selector,
-    { desc = "Select the AI model for the coding assistant" }
-  )
+  --> 2. Set up commands (this part is the same).
+  local ui = require("ai-coding-assistant.ui")
+  vim.api.nvim_create_user_command("AISelectModel", ui.model_selector, { desc = "Select AI model" })
+  vim.api.nvim_create_user_command("AICommand", ui.command_prompt, { desc = "Run AI command", range = true })
 
-  vim.api.nvim_create_user_command(
-    "AICommand",
-    ui.command_prompt,
-    { desc = "Run an AI command on the current visual selection", range = true }
-  )
+  --> 3. Set up keymaps based on the user's config.
+  local merged_opts = config.get() -- Get the final merged options
+  if merged_opts.keymaps then
+    vim.keymap.set("n", merged_opts.keymaps.select_model, "<cmd>AISelectModel<CR>", { desc = "Select AI Model" })
+    vim.keymap.set("v", merged_opts.keymaps.run_command, ":AICommand<CR>", { desc = "Run AI Command" })
+  end
 end
 
 return M
