@@ -3,16 +3,15 @@ local M = {}
 
 -- This table holds the plugin's default settings
 M.defaults = {
-  default_provider = "openai",
-  default_model = "gpt-4o",
+  default_provider = "gemini",
+  default_model = "gemini-2.5-flash",
   models = {
-    { provider = "openai", model = "gpt-4o", display = "🤖 OpenAI: GPT-4o" },
-    { provider = "openai", model = "gpt-3.5-turbo", display = "🤖 OpenAI: GPT-3.5 Turbo" },
-    { provider = "anthropic", model = "claude-3-opus-20240229", display = "🌶️ Anthropic: Claude 3 Opus" },
-    { provider = "anthropic", model = "claude-3-sonnet-20240229", display = "🌶️ Anthropic: Claude 3 Sonnet" },
-    { provider = "anthropic", model = "claude-3-haiku-20240307", display = "🌶️ Anthropic: Claude 3 Haiku" },
-    { provider = "gemini", model = "gemini-1.5-pro-latest", display = "✨ Gemini: 1.5 Pro" },
-    { provider = "gemini", model = "gemini-1.5-flash-latest", display = "⚡ Gemini: 1.5 Flash" },
+    { provider = "openai", model = "o4-mini", display = "🤖 OpenAI: GPT-o4 Mini" },
+    { provider = "openai", model = "gpt-4.1-mini", display = "🤖 OpenAI: GPT-4.1 Mini" },
+    { provider = "anthropic", model = "claude-opus-4-20250514", display = "🌶️ Anthropic: Claude Opus 4" },
+    { provider = "anthropic", model = "claude-sonnet-4-20250514", display = "🌶️ Anthropic: Claude Sonnet 4" },
+    { provider = "gemini", model = "gemini-2.5-pro", display = "✨ Gemini: 2.5 Pro" },
+    { provider = "gemini", model = "gemini-2.5-flash", display = "⚡ Gemini: 2.5 Flash" },
   },
   providers = {
     openai = {

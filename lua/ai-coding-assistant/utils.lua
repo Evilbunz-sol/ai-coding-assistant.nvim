@@ -1,6 +1,5 @@
 local M = {}
 
--- Gets the content of the current visual selection.
 -- Returns the start and end line numbers and the content as a string.
 function M.get_visual_selection()
   local start_line = vim.fn.line("'<")

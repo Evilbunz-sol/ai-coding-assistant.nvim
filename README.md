@@ -1,45 +1,52 @@
-# nvim-ai-assistant
+# AI Coding Assistant
 
-A Neovim plugin for AI-powered code assistance, integrating OpenAI, Anthropic, and Gemini APIs. Use Telescope to select AI models and run commands on visually selected code to refactor, optimize, or explain code snippets.
+A simple and configurable Neovim plugin for AI-powered code assistance, integrating with OpenAI, Anthropic, and Gemini APIs. Use Telescope to select your preferred AI model and run commands on visually selected code to refactor, document, or transform it.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Evilbunz_sol/nvim-ai-assistant/blob/main/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/Evilbunz_sol/nvim-ai-assistant)](https://github.com/Evilbunz_sol/nvim-ai-assistant)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Evilbunz_sol/ai-coding-assistant.nvim/blob/main/LICENSE)
+
+---
 
 ## Features
 
-- **Model Selection**: Choose AI models (e.g., GPT-4o, Claude, Gemini) via a Telescope picker.
-- **Code Interaction**: Run AI commands on selected code for refactoring, optimization, or explanations.
-- **Multi-Provider Support**: Supports OpenAI, Anthropic, and Gemini, with extensible provider configuration.
-- **Configurable Keymaps**: Customize keybindings for model selection and command execution.
-- **Secure API Keys**: Load API keys from a `.env` file using `dotenv.nvim`.
-- **Asynchronous Requests**: Non-blocking API calls for smooth performance.
+- **Multi-Provider Support**: Works out-of-the-box with OpenAI, Anthropic, and Gemini.
+- **Model Selection**: Instantly switch between your favorite models (e.g., GPT-4o, Claude 3 Sonnet, Gemini 1.5 Flash) using a Telescope picker.
+- **Direct Code Interaction**: Run AI commands directly on visually selected code blocks.
+- **Highly Configurable**: Customize everything from default models and providers to keymaps and the list of available models.
+- **Asynchronous by Design**: Uses non-blocking API calls to ensure your editor never freezes.
+- **Secure**: Loads your secret API keys from a local `.env` file, keeping them out of your configuration.
+
+---
 
 ## Requirements
 
 - Neovim >= 0.8
-- `curl` installed (required for API requests)
-- API keys for AI providers, stored in a `.env` file in your project root or home directory
-- Dependencies:
-  - [ellisonleao/dotenv.nvim](https://github.com/ellisonleao/dotenv.nvim)
+- `curl` installed on your system.
+- An API key for at least one AI provider.
+- The following plugin dependencies:
+
   - [nvim-telescope/telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
   - [nvim-lua/plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+  - [Joakker/nvim-dotenv](https://github.com/Joakker/nvim-dotenv) (for loading API keys)
+
+---
 
 ## Installation
 
-Install `nvim-ai-assistant` using your preferred plugin manager. Example for [Lazy.nvim](https://github.com/folke/lazy.nvim):
+Install using your preferred plugin manager.
+
+Example with **[lazy.nvim](https://github.com/folke/lazy.nvim)**:
 
 ```lua
 {
-  "Evilbunz_sol/nvim-ai-assistant",
+  "Evilbunz_sol/ai-coding-assistant.nvim",
   dependencies = {
-    "ellisonleao/dotenv.nvim",
     "nvim-telescope/telescope.nvim",
     "nvim-lua/plenary.nvim",
+    "Joakker/nvim-dotenv",
   },
   config = function()
-    require("ai-assistant").setup({
-      provider = "openai",
-      model = "gpt-4o",
+    require("ai-coding-assistant").setup({
+      -- Your custom configuration goes here (see below)
       keymaps = {
         select_model = "<leader>am",
         run_command = "<leader>ac",
@@ -49,49 +56,67 @@ Install `nvim-ai-assistant` using your preferred plugin manager. Example for [La
 }
 ```
 
+---
+
 ## Usage
 
-1. Create a `.env` file in your project root or home directory:
-   ```env
-   OPENAI_API_KEY=sk-...
-   ```
-2. In Neovim, press `<leader>am` (default: `\am`) to open the Telescope picker and select an AI model.
-3. In visual mode (`v`), select code lines.
-4. Press `<leader>ac` (`\ac`), enter a command (e.g., "Refactor this function"), and the selected code will be replaced with the AI's response.
+### Set Up API Keys
 
-**Example**:
+Create a `.env` file in your project's root directory. The plugin will automatically load these keys.
 
-- Select:
-  ```lua
-  function add(a, b)
-    return a + b
-  end
-  ```
-- Press `<leader>ac`, enter "Add input validation".
-- Result:
-  ```lua
-  function add(a, b)
-    if type(a) ~= "number" or type(b) ~= "number" then
-      error("Inputs must be numbers")
-    end
-    return a + b
-  end
-  ```
+```dotenv
+# .env file
+OPENAI_API_KEY="sk-..."
+ANTHROPIC_API_KEY="sk-ant-..."
+GOOGLE_API_KEY="..."
+```
 
-See `:help ai-assistant` for detailed documentation.
+### Select a Model (Optional)
+
+In Normal mode, press `<leader>am` (or your custom keymap) to open the Telescope picker and choose an AI model for your session.
+
+### Run a Command
+
+1. In Visual mode (v), select a block of code.
+2. Press `<leader>ac` (or your custom keymap).
+3. An input prompt will appear at the bottom of the screen. Type your instruction (e.g., "Refactor this function to be more efficient" or "Add documentation to this code").
+4. Press Enter. The selected code will be replaced with the AI's response.
+
+---
 
 ## Configuration
 
-Customize the plugin with the `setup` function:
+You can override the default settings by passing an options table to the `setup()` function.
+
+Here is the full default configuration you can use as a template:
 
 ```lua
-require("ai-assistant").setup({
-  provider = "openai", -- Default provider
-  model = "gpt-4o",   -- Default model
+require("ai-coding-assistant").setup({
+  -- The provider to use when Neovim starts
+  default_provider = "openai",
+
+  -- The model to use when Neovim starts
+  default_model = "gpt-4o",
+
+  -- Custom keymaps. Set to false to disable default keymap creation.
   keymaps = {
-    select_model = "<leader>am", -- Select AI model
-    run_command = "<leader>ac",  -- Run AI command
+    select_model = "<leader>am",
+    run_command = "<leader>ac",
   },
+
+  -- The list of models to display in the Telescope picker.
+  -- You can add, remove, or change these to your liking.
+  models = {
+    { provider = "openai", model = "gpt-4o", display = "🤖 OpenAI: GPT-4o" },
+    { provider = "openai", model = "gpt-3.5-turbo", display = "🤖 OpenAI: GPT-3.5 Turbo" },
+    { provider = "anthropic", model = "claude-3-opus-20240229", display = "🌶️ Anthropic: Claude 3 Opus" },
+    { provider = "anthropic", model = "claude-3-sonnet-20240229", display = "🌶️ Anthropic: Claude 3 Sonnet" },
+    { provider = "anthropic", model = "claude-3-haiku-20240307", display = "🌶️ Anthropic: Claude 3 Haiku" },
+    { provider = "gemini", model = "gemini-1.5-pro-latest", display = "✨ Gemini: 1.5 Pro" },
+    { provider = "gemini", model = "gemini-1.5-flash-latest", display = "⚡ Gemini: 1.5 Flash" },
+  },
+
+  -- The technical details for each provider. You can extend this to add new providers.
   providers = {
     openai = {
       api_key_env = "OPENAI_API_KEY",
@@ -103,27 +128,38 @@ require("ai-assistant").setup({
         return json_data.choices and json_data.choices[1].message.content
       end,
     },
-    -- Add custom providers (e.g., anthropic, gemini)
-  },
-  models = {
-    { provider = "openai", model = "gpt-4o-mini", display = "🤖 OpenAI: gpt-4o-mini" },
-    -- Add more models
+    anthropic = {
+      api_key_env = "ANTHROPIC_API_KEY",
+      url = "https://api.anthropic.com/v1/messages",
+      build_payload = function(model, prompt)
+        return { model = model, max_tokens = 4096, messages = { { role = "user", content = prompt } } }
+      end,
+      parse_response = function(json_data)
+        return json_data.content and json_data.content[1].text
+      end,
+    },
+    gemini = {
+      api_key_env = "GOOGLE_API_KEY",
+      url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent",
+      build_payload = function(model, prompt)
+        return { contents = { { parts = { { text = prompt } } } } }
+      end,
+      parse_response = function(json_data)
+        return json_data.candidates and json_data.candidates[1].content.parts[1].text
+      end,
+    },
   },
 })
 ```
 
-## License
-
-[MIT License](LICENSE)
+---
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
 
-- Open an [issue](https://github.com/Evilbunz_sol/nvim-ai-assistant/issues) for bugs or feature requests.
-- Submit a [pull request](https://github.com/Evilbunz_sol/nvim-ai-assistant/pulls) with improvements.
-- Suggested contributions: new AI providers, prompt templates, or UI enhancements.
+---
 
-```
+## License
 
-```
+This project is licensed under the MIT License.
