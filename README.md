@@ -2,7 +2,7 @@
 
 A simple and configurable Neovim plugin for AI-powered code assistance, integrating with OpenAI, Anthropic, and Gemini APIs. Use Telescope to select your preferred AI model and run commands on visually selected code to refactor, document, or transform it.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Evilbunz_sol/ai-coding-assistant.nvim/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Evilbunz-sol/ai-coding-assistant.nvim/blob/main/LICENSE)
 
 ---
 
