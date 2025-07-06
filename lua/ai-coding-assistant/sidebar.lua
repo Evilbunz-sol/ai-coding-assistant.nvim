@@ -1,6 +1,5 @@
 local M = {}
 
--- State now tracks the main window/buffer AND the input window/buffer
 local state = {
   chat_win = nil,
   chat_buf = nil,
@@ -9,11 +8,44 @@ local state = {
   conversation = {},
 }
 
+-- Forward declarations
 local open_sidebar
 local close_sidebar
+local submit_input
+local render_conversation
 
--- Renders the conversation history into the main chat pane
-local function render_conversation()
+-- This new function will handle the @-mention logic
+local function handle_input_change()
+  local line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
+  local trigger_word = line:match "@([%w_./-]*)$"
+
+  if trigger_word ~= nil then
+    -- We've detected an @ followed by characters. Open Telescope.
+    require("telescope.builtin").find_files({
+      prompt_title = "Select Context File",
+      cwd = vim.fn.getcwd(),
+      -- When a file is selected, this function runs
+      attach_mappings = function(prompt_bufnr, map)
+        map("i", "<CR>", function(p_bufnr)
+          local selection = require("telescope.actions.state").get_selected_entry()
+          vim.api.nvim_win_close(p_bufnr, true)
+
+          -- Replace the trigger word with the full file path
+          local new_line = line:gsub("@" .. trigger_word .. "$", "@" .. selection.value)
+          vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { new_line })
+
+          -- Return focus to the input window and place cursor at the end
+          vim.api.nvim_set_current_win(state.input_win)
+          vim.fn.feedkeys("A ", "n")
+        end)
+        return true
+      end,
+    })
+  end
+end
+
+render_conversation = function()
+  -- (This function remains the same as before)
   if not state.chat_buf or not vim.api.nvim_buf_is_valid(state.chat_buf) then return end
   local lines_to_render = {}
   for _, content in ipairs(state.conversation) do
@@ -24,48 +56,38 @@ local function render_conversation()
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', true)
   vim.api.nvim_buf_set_lines(state.chat_buf, 0, -1, false, lines_to_render)
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
-  -- Move cursor to the end of the buffer
   vim.api.nvim_win_set_cursor(state.chat_win, { #lines_to_render, 0 })
 end
 
--- This function is called when you press Enter in the input box
-local function submit_input()
+submit_input = function()
+  -- (This function remains the same as before)
   if not state.input_buf then return end
-
-  -- Get the text from the single-line input buffer
   local input = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1]
   if not input or input == "" then return end
-
-  -- Clear the input buffer for the next message
   vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { "" })
-
-  -- Update conversation history
   table.insert(state.conversation, "👤 **You**")
   table.insert(state.conversation, input)
   table.insert(state.conversation, "")
   table.insert(state.conversation, "🤖 **AI Assistant**")
   table.insert(state.conversation, "Thinking...")
   render_conversation()
-
-  -- Make the API call
   local core = require("ai-coding-assistant.core")
   core.request(input, function(response)
-    table.remove(state.conversation) -- Remove "Thinking..."
+    table.remove(state.conversation)
     table.insert(state.conversation, response)
     render_conversation()
   end)
 end
 
 close_sidebar = function()
-  -- Close both windows
+  -- (This function remains the same as before)
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     vim.api.nvim_win_close(state.chat_win, true)
   end
   if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
     vim.api.nvim_win_close(state.input_win, true)
   end
-  -- Reset the entire state
-  state = { buf = nil, win = nil, input_buf = nil, input_win = nil, conversation = {} }
+  state = { chat_win = nil, chat_buf = nil, input_win = nil, input_buf = nil, conversation = {} }
 end
 
 open_sidebar = function()
@@ -76,69 +98,44 @@ open_sidebar = function()
 
   local bottom_padding = 3
   local sidebar_height = vim.o.lines - bottom_padding
-
-  -- 1. Create the main chat history buffer and window
   state.chat_buf = vim.api.nvim_create_buf(false, true)
   local width = 60
-  local chat_win_opts = {
-    relative = 'editor',
-    width = width,
-    height = sidebar_height - 3,
-    row = 0,
-    col = vim.o.columns - width,
-    style = 'minimal',
-    border = 'single',
-    -- 'winhighlight' key removed from here
-  }
-  state.chat_win = vim.api.nvim_open_win(state.chat_buf, true, chat_win_opts)
-
-  -- 2. Create the input buffer and window
+  state.chat_win = vim.api.nvim_open_win(state.chat_buf, true, {
+    relative = 'editor', width = width, height = sidebar_height - 3, row = 0,
+    col = vim.o.columns - width, style = 'minimal', border = 'single',
+  })
   state.input_buf = vim.api.nvim_create_buf(false, true)
-  local input_win_opts = {
-    relative = 'editor',
-    width = width,
-    height = 1,
-    row = sidebar_height - 2,
-    col = vim.o.columns - width,
-    style = 'minimal',
-    border = 'single',
-    noautocmd = true,
-    -- 'winhighlight' key removed from here
-  }
-  state.input_win = vim.api.nvim_open_win(state.input_buf, true, input_win_opts)
+  state.input_win = vim.api.nvim_open_win(state.input_buf, true, {
+    relative = 'editor', width = width, height = 1, row = sidebar_height - 2,
+    col = vim.o.columns - width, style = 'minimal', border = 'single', noautocmd = true,
+  })
 
-  -- 3. Set buffer/window options
+  vim.api.nvim_win_set_option(state.chat_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal')
+  vim.api.nvim_win_set_option(state.input_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder')
   vim.api.nvim_buf_set_option(state.chat_buf, 'filetype', 'markdown')
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
   vim.api.nvim_win_set_option(state.chat_win, 'wrap', true)
 
-  --> NEW: Set window highlights AFTER creating the windows
-  vim.api.nvim_win_set_option(
-    state.chat_win,
-    'winhighlight',
-    'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal'
-  )
-  vim.api.nvim_win_set_option(
-    state.input_win,
-    'winhighlight',
-    'Normal:Normal,FloatBorder:FloatBorder'
-  )
-
-  -- 4. Set keymaps
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.chat_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('n', 'i', function() vim.api.nvim_set_current_win(state.input_win) vim.cmd('startinsert') end, { buffer = state.chat_buf, silent = true, desc = "Focus Input" })
   vim.keymap.set('i', '<CR>', submit_input, { buffer = state.input_buf, silent = true, desc = "Submit to AI" })
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.input_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('i', '<Esc>', function() vim.api.nvim_set_current_win(state.chat_win) end, { buffer = state.input_buf, silent = true, desc = "Focus Chat" })
 
-  -- 5. Final setup
+  --> NEW: Create an autocommand to watch for changes in the input buffer
+  vim.api.nvim_create_autocmd("TextChangedI", {
+    buffer = state.input_buf,
+    callback = handle_input_change,
+  })
+
   vim.api.nvim_set_current_win(state.input_win)
   vim.cmd('startinsert')
-  state.conversation = { "# AI Chat", "Press `i` to start a new conversation or `q` to close." }
+  state.conversation = { "# AI Chat", "Type your message below and press Enter." }
   render_conversation()
 end
 
-function M.toggle()
+M.toggle = function()
+  -- (This function remains the same as before)
   if (state.chat_win and vim.api.nvim_win_is_valid(state.chat_win)) then
     close_sidebar()
   else
@@ -147,4 +144,3 @@ function M.toggle()
 end
 
 return M
-
