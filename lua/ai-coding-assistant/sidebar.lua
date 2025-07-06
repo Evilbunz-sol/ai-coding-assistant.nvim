@@ -17,34 +17,40 @@ local render_conversation
 -- This new function will handle the @-mention logic
 local function handle_input_change()
   local line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
-  local trigger_word = line:match "@([%w_./-]*)$"
+  -- We now look for just the @ symbol at the end of the line
+  local trigger = line:match "@$"
 
-  if trigger_word ~= nil then
-    --> NEW: Exit insert mode before opening Telescope to ensure keys work.
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
+  if trigger then
+    -- 1. Stop insert mode immediately.
+    vim.cmd.stopinsert()
 
-    -- We've detected an @ followed by characters. Open Telescope.
-    require("telescope.builtin").find_files({
-      prompt_title = "Select Context File",
-      cwd = vim.fn.getcwd(),
-      -- When a file is selected, this function runs
-      attach_mappings = function(prompt_bufnr, map)
-        map("i", "<CR>", function(p_bufnr)
-          local selection = require("telescope.actions.state").get_selected_entry()
-          vim.api.nvim_win_close(p_bufnr, true)
+    -- 2. Schedule the Telescope picker to open.
+    -- This is the key: it waits for the current event to finish,
+    -- ensuring we are safely in Normal mode before Telescope opens.
+    vim.schedule(function()
+      require("telescope.builtin").find_files({
+        prompt_title = "Select Context File",
+        cwd = vim.fn.getcwd(),
+        attach_mappings = function(prompt_bufnr, map)
+          map("i", "<CR>", function(p_bufnr)
+            local selection = require("telescope.actions.state").get_selected_entry()
+            vim.api.nvim_win_close(p_bufnr, true)
 
-          -- Replace the trigger word with the full file path
-          local new_line = line:gsub("@" .. trigger_word .. "$", "@" .. selection.value)
-          vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { new_line })
+            -- Get the current line again, just in case.
+            local current_line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
+            -- Replace the trailing @ with the selected file path
+            local new_line = current_line:gsub("@$", "@" .. selection.value .. " ")
 
-          -- Return focus to the input window and place cursor at the end
-          vim.api.nvim_set_current_win(state.input_win)
-          vim.cmd('startinsert') -- Re-enter insert mode
-          vim.fn.feedkeys("A ", "n")
-        end)
-        return true
-      end,
-    })
+            vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { new_line })
+
+            -- Return focus to the input window and re-enter insert mode
+            vim.api.nvim_set_current_win(state.input_win)
+            vim.cmd.startinsert()
+          end)
+          return true
+        end,
+      })
+    end)
   end
 end
 
