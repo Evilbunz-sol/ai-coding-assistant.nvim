@@ -20,6 +20,9 @@ local function handle_input_change()
   local trigger_word = line:match "@([%w_./-]*)$"
 
   if trigger_word ~= nil then
+    --> NEW: Exit insert mode before opening Telescope to ensure keys work.
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
+
     -- We've detected an @ followed by characters. Open Telescope.
     require("telescope.builtin").find_files({
       prompt_title = "Select Context File",
@@ -36,6 +39,7 @@ local function handle_input_change()
 
           -- Return focus to the input window and place cursor at the end
           vim.api.nvim_set_current_win(state.input_win)
+          vim.cmd('startinsert') -- Re-enter insert mode
           vim.fn.feedkeys("A ", "n")
         end)
         return true
