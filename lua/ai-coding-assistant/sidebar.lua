@@ -79,7 +79,7 @@ open_sidebar = function()
   vim.api.nvim_buf_set_option(state.buf, 'modifiable', false)
 
   -- Set window options
-  vim.api.nvim_win_set_width(state.win, 80)
+  vim.api.nvim_win_set_width(state.win, 30)
   vim.api.nvim_win_set_option(state.win, 'winfixwidth', true)
   vim.api.nvim_win_set_option(state.win, 'number', false)
   vim.api.nvim_win_set_option(state.win, 'relativenumber', false)
