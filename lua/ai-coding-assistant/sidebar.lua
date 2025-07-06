@@ -74,7 +74,7 @@ open_sidebar = function()
     return
   end
 
-  local bottom_padding = 3.5
+  local bottom_padding = 3
   local sidebar_height = vim.o.lines - bottom_padding
 
   -- 1. Create the main chat history buffer and window
