@@ -29,14 +29,30 @@ prompt_for_input = function()
     table.insert(state.conversation, input)
     table.insert(state.conversation, "")
 
-    local thinking_index = #state.conversation + 1
     table.insert(state.conversation, "🤖 **AI Assistant**")
     table.insert(state.conversation, "Thinking...")
     render_conversation()
 
     local core = require("ai-coding-assistant.core")
+
+    --> THE FIX IS IN THIS CALLBACK FUNCTION
     core.request(input, function(response)
-      state.conversation[thinking_index + 1] = response
+      -- Remove the "Thinking..." message and the "AI Assistant" title
+      table.remove(state.conversation)
+      table.remove(state.conversation)
+
+      -- Re-add the title
+      table.insert(state.conversation, "🤖 **AI Assistant**")
+
+      -- Split the potentially multi-line response from the AI into a table of lines
+      local response_lines = vim.split(response, "\n")
+
+      -- Add each line of the response to the conversation history
+      for _, line in ipairs(response_lines) do
+        table.insert(state.conversation, line)
+      end
+
+      -- Re-render the conversation with the final, formatted AI response
       render_conversation()
     end)
   end)
