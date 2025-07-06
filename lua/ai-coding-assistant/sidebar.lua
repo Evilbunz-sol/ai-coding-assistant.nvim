@@ -85,8 +85,7 @@ open_sidebar = function()
     col = vim.o.columns - width,
     style = 'minimal',
     border = 'single',
-    --> NEW: Add this line to match your theme
-    winhighlight = 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal',
+    -- 'winhighlight' key removed from here
   }
   state.chat_win = vim.api.nvim_open_win(state.chat_buf, true, chat_win_opts)
 
@@ -101,8 +100,7 @@ open_sidebar = function()
     style = 'minimal',
     border = 'single',
     noautocmd = true,
-    --> NEW: Add this line to match your theme
-    winhighlight = 'Normal:Normal,FloatBorder:FloatBorder',
+    -- 'winhighlight' key removed from here
   }
   state.input_win = vim.api.nvim_open_win(state.input_buf, true, input_win_opts)
 
@@ -111,21 +109,29 @@ open_sidebar = function()
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
   vim.api.nvim_win_set_option(state.chat_win, 'wrap', true)
 
-  -- 4. Set keymaps
-  -- For the main chat window
-  vim.keymap.set('n', 'q', close_sidebar, { buffer = state.chat_buf, silent = true, desc = "Close Chat" })
-  vim.keymap.set('n', 'i', function() vim.api.nvim_set_current_win(state.input_win) end, { buffer = state.chat_buf, silent = true, desc = "Focus Input" })
+  --> NEW: Set window highlights AFTER creating the windows
+  vim.api.nvim_win_set_option(
+    state.chat_win,
+    'winhighlight',
+    'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal'
+  )
+  vim.api.nvim_win_set_option(
+    state.input_win,
+    'winhighlight',
+    'Normal:Normal,FloatBorder:FloatBorder'
+  )
 
-  -- For the input window
+  -- 4. Set keymaps
+  vim.keymap.set('n', 'q', close_sidebar, { buffer = state.chat_buf, silent = true, desc = "Close Chat" })
+  vim.keymap.set('n', 'i', function() vim.api.nvim_set_current_win(state.input_win) vim.cmd('startinsert') end, { buffer = state.chat_buf, silent = true, desc = "Focus Input" })
   vim.keymap.set('i', '<CR>', submit_input, { buffer = state.input_buf, silent = true, desc = "Submit to AI" })
-  --> NEW: Add these keymaps for the input window
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.input_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('i', '<Esc>', function() vim.api.nvim_set_current_win(state.chat_win) end, { buffer = state.input_buf, silent = true, desc = "Focus Chat" })
 
   -- 5. Final setup
   vim.api.nvim_set_current_win(state.input_win)
   vim.cmd('startinsert')
-  state.conversation = { "# AI Chat", "Type your message below and press Enter." }
+  state.conversation = { "# AI Chat", "Press `i` to start a new conversation or `q` to close." }
   render_conversation()
 end
 
