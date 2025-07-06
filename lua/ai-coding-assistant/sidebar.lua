@@ -74,13 +74,16 @@ open_sidebar = function()
     return
   end
 
+  local bottom_padding = 5
+  local sidebar_height = vim.o.lines - bottom_padding
+
   -- 1. Create the main chat history buffer and window
   state.chat_buf = vim.api.nvim_create_buf(false, true)
   local width = 60
   local chat_win_opts = {
     relative = 'editor',
     width = width,
-    height = vim.o.lines - 3,
+    height = sidebar_height - 3,
     row = 0,
     col = vim.o.columns - width,
     style = 'minimal',
@@ -95,7 +98,7 @@ open_sidebar = function()
     relative = 'editor',
     width = width,
     height = 1,
-    row = vim.o.lines - 2,
+    row = sidebar_height - 2,
     col = vim.o.columns - width,
     style = 'minimal',
     border = 'single',
