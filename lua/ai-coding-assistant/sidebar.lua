@@ -76,7 +76,7 @@ open_sidebar = function()
 
   -- 1. Create the main chat history buffer and window
   state.chat_buf = vim.api.nvim_create_buf(false, true)
-  local width = 80
+  local width = 60
   local chat_win_opts = {
     relative = 'editor',
     width = width,
