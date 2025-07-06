@@ -73,18 +73,29 @@ open_sidebar = function()
   vim.cmd('vsplit')
   state.win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(state.win, state.buf)
+
+  -- Configure the buffer
   vim.api.nvim_buf_set_option(state.buf, 'filetype', 'markdown')
   vim.api.nvim_buf_set_option(state.buf, 'modifiable', false)
+
+  -- Set window options
   vim.api.nvim_win_set_width(state.win, 80)
   vim.api.nvim_win_set_option(state.win, 'winfixwidth', true)
   vim.api.nvim_win_set_option(state.win, 'number', false)
   vim.api.nvim_win_set_option(state.win, 'relativenumber', false)
   vim.api.nvim_win_set_option(state.win, 'signcolumn', 'no')
+  --> ADD THIS LINE TO ENABLE WORD WRAPPING
+  vim.api.nvim_win_set_option(state.win, 'wrap', true)
+
+  -- Set keymaps that ONLY work in this buffer
   vim.keymap.set('n', 'i', prompt_for_input, { buffer = state.buf, silent = true, desc = "Ask AI" })
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.buf, silent = true, desc = "Close Chat" })
+
+  -- Add a welcome message and render
   state.conversation = { "# AI Chat", "Press `i` to start a new conversation or `q` to close." }
   render_conversation()
 end
+
 
 function M.toggle()
   if state.win and vim.api.nvim_win_is_valid(state.win) then
