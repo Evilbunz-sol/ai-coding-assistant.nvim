@@ -12,13 +12,26 @@ local open_sidebar
 local close_sidebar
 local prompt_for_input
 
+--> THIS IS THE NEW, MORE ROBUST RENDERER
 local function render_conversation()
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
+
+  local lines_to_render = {}
+  -- Loop through every message in our history
+  for _, content in ipairs(state.conversation) do
+    -- Split the message into individual lines, just in case it's multi-line
+    local split_lines = vim.split(content, "\n")
+    for _, s_line in ipairs(split_lines) do
+      table.insert(lines_to_render, s_line)
+    end
+  end
+
   vim.api.nvim_buf_set_option(state.buf, 'modifiable', true)
-  vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, state.conversation)
+  vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines_to_render)
   vim.api.nvim_buf_set_option(state.buf, 'modifiable', false)
 end
 
+--> THIS FUNCTION IS NOW SIMPLER
 prompt_for_input = function()
   vim.ui.input({
     prompt = "Ask AI: ",
@@ -28,31 +41,16 @@ prompt_for_input = function()
     table.insert(state.conversation, "👤 **You**")
     table.insert(state.conversation, input)
     table.insert(state.conversation, "")
-
     table.insert(state.conversation, "🤖 **AI Assistant**")
     table.insert(state.conversation, "Thinking...")
     render_conversation()
 
     local core = require("ai-coding-assistant.core")
-
-    --> THE FIX IS IN THIS CALLBACK FUNCTION
     core.request(input, function(response)
-      -- Remove the "Thinking..." message and the "AI Assistant" title
+      -- Remove the "Thinking..." placeholder
       table.remove(state.conversation)
-      table.remove(state.conversation)
-
-      -- Re-add the title
-      table.insert(state.conversation, "🤖 **AI Assistant**")
-
-      -- Split the potentially multi-line response from the AI into a table of lines
-      local response_lines = vim.split(response, "\n")
-
-      -- Add each line of the response to the conversation history
-      for _, line in ipairs(response_lines) do
-        table.insert(state.conversation, line)
-      end
-
-      -- Re-render the conversation with the final, formatted AI response
+      -- Replace it with the final response from the AI
+      table.insert(state.conversation, response)
       render_conversation()
     end)
   end)
@@ -65,39 +63,25 @@ close_sidebar = function()
   state.win, state.buf, state.conversation = nil, nil, {}
 end
 
---> THIS IS THE CORRECTED OPEN_SIDEBAR FUNCTION
 open_sidebar = function()
   if state.win and vim.api.nvim_win_is_valid(state.win) then
     vim.api.nvim_set_current_win(state.win)
     return
   end
 
-  -- Create a new scratch buffer for the chat first
   state.buf = vim.api.nvim_create_buf(false, true)
-
-  -- Open the window as a vertical split on the right
   vim.cmd('vsplit')
   state.win = vim.api.nvim_get_current_win()
-
-  -- Now, place our dedicated buffer into the new window
   vim.api.nvim_win_set_buf(state.win, state.buf)
-
-  -- Configure the buffer AFTER it's in the window
   vim.api.nvim_buf_set_option(state.buf, 'filetype', 'markdown')
-  vim.api.nvim_buf_set_option(state.buf, 'modifiable', false) -- Set to read-only
-
-  -- Set window options
+  vim.api.nvim_buf_set_option(state.buf, 'modifiable', false)
   vim.api.nvim_win_set_width(state.win, 80)
   vim.api.nvim_win_set_option(state.win, 'winfixwidth', true)
   vim.api.nvim_win_set_option(state.win, 'number', false)
   vim.api.nvim_win_set_option(state.win, 'relativenumber', false)
   vim.api.nvim_win_set_option(state.win, 'signcolumn', 'no')
-
-  -- Set keymaps that ONLY work in this buffer
   vim.keymap.set('n', 'i', prompt_for_input, { buffer = state.buf, silent = true, desc = "Ask AI" })
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.buf, silent = true, desc = "Close Chat" })
-
-  -- Add a welcome message and render
   state.conversation = { "# AI Chat", "Press `i` to start a new conversation or `q` to close." }
   render_conversation()
 end
