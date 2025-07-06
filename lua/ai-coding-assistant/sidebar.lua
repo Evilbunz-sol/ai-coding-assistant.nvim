@@ -17,16 +17,10 @@ local render_conversation
 -- This new function will handle the @-mention logic
 local function handle_input_change()
   local line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
-  -- We now look for just the @ symbol at the end of the line
   local trigger = line:match "@$"
 
   if trigger then
-    -- 1. Stop insert mode immediately.
     vim.cmd.stopinsert()
-
-    -- 2. Schedule the Telescope picker to open.
-    -- This is the key: it waits for the current event to finish,
-    -- ensuring we are safely in Normal mode before Telescope opens.
     vim.schedule(function()
       require("telescope.builtin").find_files({
         prompt_title = "Select Context File",
@@ -34,16 +28,13 @@ local function handle_input_change()
         attach_mappings = function(prompt_bufnr, map)
           map("i", "<CR>", function(p_bufnr)
             local selection = require("telescope.actions.state").get_selected_entry()
-            vim.api.nvim_win_close(p_bufnr, true)
 
-            -- Get the current line again, just in case.
+            --> THIS IS THE CORRECTED LINE
+            require("telescope.actions").close(p_bufnr)
+
             local current_line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
-            -- Replace the trailing @ with the selected file path
             local new_line = current_line:gsub("@$", "@" .. selection.value .. " ")
-
             vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { new_line })
-
-            -- Return focus to the input window and re-enter insert mode
             vim.api.nvim_set_current_win(state.input_win)
             vim.cmd.startinsert()
           end)
