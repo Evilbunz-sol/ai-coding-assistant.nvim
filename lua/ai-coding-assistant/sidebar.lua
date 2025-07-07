@@ -1,5 +1,4 @@
 local context = require("ai-coding-assistant.context")
-local diff = require("ai-coding-assistant.diff")
 
 local M = {}
 
