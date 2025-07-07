@@ -9,14 +9,15 @@ M.state = {
 --> THE FUNCTION NOW ACCEPTS A 'context' ARGUMENT
 function M.request(prompt, context, callback)
   local config = require("ai-coding-assistant.config").get()
+  local state = require("ai-coding-assistant.core").state
 
-  if not M.state.current.provider then
-    M.state.current.provider = config.default_provider
-    M.state.current.model = config.default_model
+  if not state.current.provider then
+    state.current.provider = config.default_provider
+    state.current.model = config.default_model
   end
 
-  local provider_name = M.state.current.provider
-  local model_name = M.state.current.model
+  local provider_name = state.current.provider
+  local model_name = state.current.model
   local provider = config.providers[provider_name]
   local api_key = os.getenv(provider.api_key_env)
 
@@ -25,23 +26,25 @@ function M.request(prompt, context, callback)
     return
   end
 
-  --> NEW: CONSTRUCT THE FINAL PROMPT
+  --> NEW: Define a specific system prompt for generating diffs.
+  local system_prompt = "You are an expert code assistant. When asked to change code, you must only respond with the changes in the unified diff format, enclosed in a markdown code block. Do not include any other explanatory text."
+
   local final_prompt
   if context then
-    -- If context was provided, create an "augmented" prompt
-    final_prompt = "Given the following context from the codebase:\n\n" .. context ..
-                     "\n\nPlease respond to the following request:\n\n" .. prompt
+    final_prompt = "System instruction: " .. system_prompt ..
+                     "\n\nGiven the following context from the codebase:\n\n" .. context ..
+                     "\n\nPlease perform the following task:\n\n" .. prompt
   else
-    -- Otherwise, use the original prompt
-    final_prompt = prompt
+    final_prompt = "System instruction: " .. system_prompt ..
+                     "\n\nPlease perform the following task:\n\n" .. prompt
   end
 
+  -- The rest of the function remains the same...
   local payload = provider.build_payload(model_name, final_prompt)
   local payload_json = vim.json.encode(payload)
   local provider_url = provider.url
   local curl_args = { "-s", "-X", "POST", provider_url, "-d", payload_json }
 
-  -- ... (The rest of the API call logic is the same)
   if provider_name == "openai" then
     table.insert(curl_args, "-H")
     table.insert(curl_args, "Authorization: Bearer " .. api_key)
