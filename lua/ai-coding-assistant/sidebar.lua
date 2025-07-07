@@ -136,10 +136,10 @@ open_sidebar = function()
     vim.api.nvim_set_current_win(state.input_win or state.chat_win)
     return
   end
-  local bottom_padding = 5
+  local bottom_padding = 3
   local sidebar_height = vim.o.lines - bottom_padding
   state.chat_buf = vim.api.nvim_create_buf(false, true)
-  local width = 80
+  local width = 60
   state.chat_win = vim.api.nvim_open_win(state.chat_buf, true, {
     relative = 'editor', width = width, height = sidebar_height - 3, row = 0,
     col = vim.o.columns - width, style = 'minimal', border = 'single',
