@@ -1,3 +1,5 @@
+local context = require("ai-coding-assistant.context")
+
 local M = {}
 
 local state = {
@@ -61,24 +63,34 @@ render_conversation = function()
 end
 
 submit_input = function()
-  -- (This function remains the same as before)
   if not state.input_buf then return end
+
   local input = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1]
   if not input or input == "" then return end
+
   vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { "" })
+
+  --> NEW: Parse the input for @-mentions BEFORE doing anything else.
+  local clean_prompt, context_block = context.parse(input)
+
+  -- Add the user's message to the history (using the clean version without @)
   table.insert(state.conversation, "👤 **You**")
-  table.insert(state.conversation, input)
+  table.insert(state.conversation, clean_prompt)
   table.insert(state.conversation, "")
   table.insert(state.conversation, "🤖 **AI Assistant**")
   table.insert(state.conversation, "Thinking...")
   render_conversation()
+
   local core = require("ai-coding-assistant.core")
-  core.request(input, function(response)
-    table.remove(state.conversation)
+
+  --> NEW: Pass the context_block to the core engine.
+  core.request(clean_prompt, context_block, function(response)
+    table.remove(state.conversation) -- Remove "Thinking..."
     table.insert(state.conversation, response)
     render_conversation()
   end)
 end
+
 
 close_sidebar = function()
   -- (This function remains the same as before)
