@@ -90,38 +90,36 @@ submit_input = function()
 
   local core = require("ai-coding-assistant.core")
 
+  --> THIS IS THE NEW, SAFER CALLBACK LOGIC
   core.request(clean_prompt, context_block, function(response)
-    -- Remove the "Thinking..." message
-    table.remove(state.conversation)
+    -- Find the index of our "Thinking..." placeholder. It's always the last item.
+    local thinking_index = #state.conversation
 
-    -- Try to parse a diff from the AI's response
     local parsed_diff, err = diff.parse(response)
 
     if parsed_diff then
-      -- If a diff was found:
-      -- 1. Extract the conversational part (the text before the diff block)
+      -- If a diff was found, replace "Thinking..." with the explanation text.
       local explanation = response:match("^(.-)```diff") or "Here are the proposed changes:"
-      table.insert(state.conversation, explanation:gsub("^%s*", ""):gsub("%s*$", ""))
+      state.conversation[thinking_index] = explanation:gsub("^%s*", ""):gsub("%s*$", "")
 
-      -- 2. Apply the highlights to the target code file
+      -- Apply the highlights to the code file.
       highlighter.apply(parsed_diff)
 
-      -- 3. Add a confirmation message to the chat
-      table.insert(state.conversation, "\n*Changes have been highlighted in the source file.*")
-
+      -- Add a new confirmation message to the chat.
+      table.insert(state.conversation, "") -- Add a blank line for spacing
+      table.insert(state.conversation, "*Changes have been highlighted in the source file.*")
     elseif err then
-      -- If parsing failed, show the error
-      table.insert(state.conversation, "Error parsing diff: " .. err)
+      -- If parsing failed, replace "Thinking..." with an error message.
+      state.conversation[thinking_index] = "Error parsing diff: " .. err
     else
-      -- If no diff was found, treat it as a normal chat message
-      table.insert(state.conversation, response)
+      -- If no diff was found, replace "Thinking..." with the normal response.
+      state.conversation[thinking_index] = response
     end
 
-    -- Re-render the chat window with the new content
+    -- Re-render the chat window with the final content.
     render_conversation()
   end)
 end
-
 
 close_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
