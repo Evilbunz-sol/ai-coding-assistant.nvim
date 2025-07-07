@@ -109,9 +109,9 @@ open_sidebar = function()
   vim.api.nvim_win_set_option(state.chat_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal')
   vim.api.nvim_win_set_option(state.input_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder')
 
-  --> NEW: Define a highlight group for the code block.
-  -- It links to 'ColorColumn' which usually has a subtle background color in most themes.
-  vim.api.nvim_set_hl(0, "AICodeBlock", { link = "ColorColumn" })
+  --> THE ONLY CHANGE IS THIS LINE
+  -- We now define a specific background color instead of linking to the theme.
+  vim.api.nvim_set_hl(0, "AICodeBlock", { bg = "#2E3440" }) -- A dark grey background
 
   vim.api.nvim_buf_set_option(state.chat_buf, 'filetype', 'markdown')
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
