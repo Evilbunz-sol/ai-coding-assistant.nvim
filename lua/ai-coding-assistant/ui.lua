@@ -5,7 +5,6 @@ local actions = require("telescope.actions")
 local conf = require("telescope.config").values
 
 local core = require("ai-coding-assistant.core")
-local utils = require("ai-coding-assistant.utils")
 
 local M = {}
 
@@ -33,34 +32,6 @@ function M.model_selector()
       return true
     end,
   }):find()
-end
-
--- The command_prompt function to make a request to an LLM.
-function M.command_prompt()
-  vim.ui.input({
-    prompt = "Enter AI Command...",
-  }, function(prompt)
-    if not prompt or prompt == "" then
-      return
-    end
-
-    vim.cmd('redraw')
-    local start_line, end_line, selection = utils.get_visual_selection()
-
-    if selection == "" then
-      vim.notify("No visual selection found.", vim.log.levels.WARN, { title = "AI Assistant" })
-      return
-    end
-    
-    local full_prompt = "Instruction: " .. prompt .. "\n\n" .. "Code:\n```\n" .. selection .. "\n```"
-
-    vim.notify("Sending request to AI...", vim.log.levels.INFO, { title = "AI Assistant" })
-    
-    core.request(full_prompt, function(ai_response)
-      utils.replace_lines(start_line, end_line, ai_response)
-      vim.notify("AI code replacement complete.", vim.log.levels.INFO, { title = "AI Assistant" })
-    end)
-  end)
 end
 
 return M
