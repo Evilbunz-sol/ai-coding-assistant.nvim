@@ -1,4 +1,5 @@
 local context = require("ai-coding-assistant.context")
+local diff = require("ai-coding-assistant.diff")
 
 local M = {}
 
@@ -47,17 +48,45 @@ local function handle_input_change()
   end
 end
 
-render_conversation = function()
-  -- (This function remains the same as before)
+local function render_conversation()
   if not state.chat_buf or not vim.api.nvim_buf_is_valid(state.chat_buf) then return end
+
   local lines_to_render = {}
+  local highlights = {}
+  local line_num = 1
+
   for _, content in ipairs(state.conversation) do
-    for _, s_line in ipairs(vim.split(content, "\n")) do
-      table.insert(lines_to_render, s_line)
+    -- NEW: Check if the content is a diff block
+    if content:match("```diff") then
+      local parsed_diff = diff.parse(content)
+      for _, diff_line in ipairs(parsed_diff) do
+        table.insert(lines_to_render, diff_line.content)
+        if diff_line.type == "add" then
+          -- Add a highlight for the entire line
+          table.insert(highlights, { "DiffAdd", line_num - 1, 0, -1 })
+        elseif diff_line.type == "delete" then
+          table.insert(highlights, { "DiffDelete", line_num - 1, 0, -1 })
+        end
+        line_num = line_num + 1
+      end
+    else
+      -- Original logic for plain text
+      for _, s_line in ipairs(vim.split(content, "\n")) do
+        table.insert(lines_to_render, s_line)
+        line_num = line_num + 1
+      end
     end
   end
+
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', true)
+  vim.api.nvim_buf_clear_namespace(state.chat_buf, -1, 0, -1) -- Clear old highlights
   vim.api.nvim_buf_set_lines(state.chat_buf, 0, -1, false, lines_to_render)
+
+  -- Apply the new highlights
+  for _, hl in ipairs(highlights) do
+    vim.api.nvim_buf_add_highlight(state.chat_buf, -1, hl[1], hl[2], hl[3], hl[4])
+  end
+
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
   vim.api.nvim_win_set_cursor(state.chat_win, { #lines_to_render, 0 })
 end
@@ -109,6 +138,7 @@ open_sidebar = function()
     return
   end
 
+  -- ... (window creation logic is the same) ...
   local bottom_padding = 3
   local sidebar_height = vim.o.lines - bottom_padding
   state.chat_buf = vim.api.nvim_create_buf(false, true)
@@ -123,27 +153,26 @@ open_sidebar = function()
     col = vim.o.columns - width, style = 'minimal', border = 'single', noautocmd = true,
   })
 
+  -- ... (winhighlight options are the same) ...
   vim.api.nvim_win_set_option(state.chat_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal')
   vim.api.nvim_win_set_option(state.input_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder')
+
+  -- NEW: Define the highlight groups for our diffs
+  vim.api.nvim_set_hl(0, "DiffAdd", { fg = "#A3BE8C" }) -- Green
+  vim.api.nvim_set_hl(0, "DiffDelete", { fg = "#BF616A" }) -- Red
+
+  -- ... (the rest of the function is the same) ...
   vim.api.nvim_buf_set_option(state.chat_buf, 'filetype', 'markdown')
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
   vim.api.nvim_win_set_option(state.chat_win, 'wrap', true)
-
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.chat_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('n', 'i', function() vim.api.nvim_set_current_win(state.input_win) vim.cmd('startinsert') end, { buffer = state.chat_buf, silent = true, desc = "Focus Input" })
   vim.keymap.set('i', '<CR>', submit_input, { buffer = state.input_buf, silent = true, desc = "Submit to AI" })
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.input_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('i', '<Esc>', function() vim.api.nvim_set_current_win(state.chat_win) end, { buffer = state.input_buf, silent = true, desc = "Focus Chat" })
-
-  --> NEW: Create an autocommand to watch for changes in the input buffer
-  vim.api.nvim_create_autocmd("TextChangedI", {
-    buffer = state.input_buf,
-    callback = handle_input_change,
-  })
-
   vim.api.nvim_set_current_win(state.input_win)
   vim.cmd('startinsert')
-  state.conversation = { "# AI Chat", "Type your message below and press Enter." }
+  state.conversation = { "# AI Chat", "Press `i` to start a new conversation or `q` to close." }
   render_conversation()
 end
 
