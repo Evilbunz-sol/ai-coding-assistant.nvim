@@ -26,8 +26,8 @@ function M.request(prompt, context, callback)
     return
   end
 
-  --> NEW: Define a specific system prompt for generating diffs.
-  local system_prompt = "You are an expert code assistant. When asked to change code, you must only respond with the changes in the unified diff format, enclosed in a markdown code block. Do not include any other explanatory text."
+  --> NEW: This is the updated system prompt.
+  local system_prompt = "You are an expert code assistant. First, provide a concise explanation of your proposed changes. After your explanation, on a new line, provide only the code changes in the unified diff format, enclosed in a markdown code block (```diff). Do not include any other text after the diff block."
 
   local final_prompt
   if context then
@@ -39,7 +39,7 @@ function M.request(prompt, context, callback)
                      "\n\nPlease perform the following task:\n\n" .. prompt
   end
 
-  -- The rest of the function remains the same...
+  -- The rest of the function remains the same.
   local payload = provider.build_payload(model_name, final_prompt)
   local payload_json = vim.json.encode(payload)
   local provider_url = provider.url
