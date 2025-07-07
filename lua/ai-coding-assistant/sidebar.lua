@@ -1,4 +1,7 @@
 local context = require("ai-coding-assistant.context")
+local diff = require("ai-coding-assistant.diff")
+local highlighter = require("ai-coding-assistant.highlighter")
+
 local M = {}
 
 local state = {
@@ -71,23 +74,54 @@ end
 
 submit_input = function()
   if not state.input_buf then return end
+
   local input = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1]
   if not input or input == "" then return end
+
   vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { "" })
   local clean_prompt, context_block = context.parse(input)
+
   table.insert(state.conversation, "👤 **You**")
   table.insert(state.conversation, clean_prompt)
   table.insert(state.conversation, "")
   table.insert(state.conversation, "🤖 **AI Assistant**")
   table.insert(state.conversation, "Thinking...")
   render_conversation()
+
   local core = require("ai-coding-assistant.core")
+
   core.request(clean_prompt, context_block, function(response)
+    -- Remove the "Thinking..." message
     table.remove(state.conversation)
-    table.insert(state.conversation, response)
+
+    -- Try to parse a diff from the AI's response
+    local parsed_diff, err = diff.parse(response)
+
+    if parsed_diff then
+      -- If a diff was found:
+      -- 1. Extract the conversational part (the text before the diff block)
+      local explanation = response:match("^(.-)```diff") or "Here are the proposed changes:"
+      table.insert(state.conversation, explanation:gsub("^%s*", ""):gsub("%s*$", ""))
+
+      -- 2. Apply the highlights to the target code file
+      highlighter.apply(parsed_diff)
+
+      -- 3. Add a confirmation message to the chat
+      table.insert(state.conversation, "\n*Changes have been highlighted in the source file.*")
+
+    elseif err then
+      -- If parsing failed, show the error
+      table.insert(state.conversation, "Error parsing diff: " .. err)
+    else
+      -- If no diff was found, treat it as a normal chat message
+      table.insert(state.conversation, response)
+    end
+
+    -- Re-render the chat window with the new content
     render_conversation()
   end)
 end
+
 
 close_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
