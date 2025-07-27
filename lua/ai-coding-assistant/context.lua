@@ -34,7 +34,7 @@ local function read_path_content(path)
   end
 end
 
--- The new, smarter parse function
+-- The parse function
 function M.parse(input_prompt)
   local context_parts = {}
   local prompt_words = vim.split(input_prompt, "%s+")
