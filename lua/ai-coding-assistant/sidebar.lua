@@ -114,6 +114,7 @@ submit_input = function()
   if not input or input == "" then return end
 
   vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { "" })
+  -- ⭐️ CHANGE: Pass the saved buffer number to the context parser
   local clean_prompt, context_block = context.parse(input, state.last_active_bufnr)
 
   table.insert(state.conversation, "👤 **You**")
@@ -130,7 +131,7 @@ submit_input = function()
     local parsed_diff, err = diff.parse(response)
 
     if parsed_diff then
-     local explanation = response:match("^(.-)```diff"
+      local explanation = response:match("^(.-)```diff") or "Here are the proposed changes:"
       state.conversation[thinking_index] = explanation:gsub("^%s*", ""):gsub("%s*$", "")
       highlighter.apply(parsed_diff)
       table.insert(state.conversation, "")
@@ -158,20 +159,15 @@ close_sidebar = function()
   state = { chat_win = nil, chat_buf = nil, input_win = nil, input_buf = nil, conversation = {}, last_active_bufnr = nil }
 end
 
--- Capture the buffer handle when opening the sidebar, but only if it's named
+-- Capture the buffer handle when opening the sidebar
 open_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     vim.api.nvim_set_current_win(state.input_win or state.chat_win)
     return
   end
 
-  local current_buf = vim.api.nvim_get_current_buf()
-  local buf_name = vim.api.nvim_buf_get_name(current_buf)
-  if buf_name ~= "" then
-    state.last_active_bufnr = current_buf
-  else
-    state.last_active_bufnr = nil  -- Skip if unnamed
-  end
+  -- ⭐️ CHANGE: Right before creating windows, save the current buffer handle
+  state.last_active_bufnr = vim.api.nvim_get_current_buf()
 
   local bottom_padding = 3
   local sidebar_height = vim.o.lines - bottom_padding

@@ -1,106 +1,58 @@
+-- lua/ai-coding-assistant/context.lua
 local M = {}
 
--- Helper function to read file/directory content safely
 local function read_path_content(path)
+  -- This helper function remains the same as your version
   local full_path = vim.fn.fnamemodify(path, ":p")
-  local content = {}
-  local err = nil
+  if vim.fn.filereadable(full_path) ~= 1 then return nil, "Path is not a readable file: " .. path end
 
-  if vim.fn.filereadable(full_path) == 1 then
-    local file = io.open(full_path, "r")
-    if not file then
-      return nil, "Could not open file: " .. path
-    end
-    local file_content = file:read("*a")
-    file:close()
-    table.insert(content, file_content)
-  elseif vim.fn.isdirectory(full_path) == 1 then
-    -- For directories, list the contents
-    local files = vim.fn.readdir(full_path)
-    table.insert(content, "Directory listing for " .. path .. ":\n")
-    for _, file in ipairs(files) do
-      if file ~= "." and file ~= ".." then
-        table.insert(content, "- " .. file)
-      end
-    end
-  else
-    err = "Path not found: " .. path
-  end
+  local file = io.open(full_path, "r")
+  if not file then return nil, "Could not open file: " .. path end
 
-  if #content > 0 then
-    return table.concat(content, "\n"), nil
-  else
-    return nil, err
-  end
+  local content = file:read("*a")
+  file:close()
+  return content, nil
 end
 
--- The parse function
-function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' argument
-  local context_parts = {}
-  local prompt_words = vim.split(input_prompt, "%s+")
-  local final_prompt_words = {}
+
+function M.parse(input_prompt, default_bufnr)
+  local context_blocks = {}
   local paths_to_process = {}
-  local paths_processed = {}
 
-  -- First, parse any leading file paths
-  local path_word_count = 0
-  for i, word in ipairs(prompt_words) do
-    if vim.fn.filereadable(word) == 1 or vim.fn.isdirectory(word) == 1 then
-      table.insert(paths_to_process, word)
-      path_word_count = i
-    else
-      break
-    end
-  end
+  -- Create a mutable copy of the prompt to strip mentions from
+  local clean_prompt = input_prompt
 
-  -- The rest of the words form the main prompt text
-  for i = path_word_count + 1, #prompt_words do
-    table.insert(final_prompt_words, prompt_words[i])
-  end
-  local clean_prompt = table.concat(final_prompt_words, " ")
-
-  -- Second, find any @-mentions in the remaining prompt
-  for path in clean_prompt:gmatch("@([%w_./-]+)") do
+  -- Find all @-mentions and add them to the list to be processed
+  for path in input_prompt:gmatch("@([%w_./-]+)") do
     table.insert(paths_to_process, path)
-    -- Fix: Replace "@path" with "path" to keep the filename in the prompt but remove @
-    clean_prompt = clean_prompt:gsub("@" .. path, path)
+    -- Replace the mention in the clean prompt to avoid sending it to the AI
+    clean_prompt = clean_prompt:gsub("@" .. path, "")
   end
 
-  -- Trim any extra spaces from clean_prompt
-  clean_prompt = clean_prompt:gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
 
-  -- Process all collected explicit paths
-  for _, path in ipairs(paths_to_process) do
-    if not paths_processed[path] then
-      local content, err = read_path_content(path)
-      if content then
-        table.insert(context_parts, "--- Context from: " .. path .. " ---\n")
-        table.insert(context_parts, content)
-        table.insert(context_parts, "\n--- End of Context ---\n")
-      else
-        vim.notify(err, vim.log.levels.WARN, { title = "AI Assistant" })
-      end
-      paths_processed[path] = true
-    end
-  end
-
-  -- If no explicit paths were found, use the default buffer if valid and named
   if #paths_to_process == 0 and default_bufnr and vim.api.nvim_buf_is_valid(default_bufnr) then
     local buf_path = vim.api.nvim_buf_get_name(default_bufnr)
-    if buf_path and buf_path ~= "" and vim.fn.filereadable(buf_path) == 1 then
-      local content, err = read_path_content(buf_path)
-      if content then
-        table.insert(context_parts, "--- Context from: " .. buf_path .. " ---\n")
-        table.insert(context_parts, content)
-        table.insert(context_parts, "\n--- End of Context ---\n")
-      elseif err then
-        vim.notify(err, vim.log.levels.WARN, { title = "AI Assistant" })
-      end
+    if buf_path and buf_path ~= "" then
+      table.insert(paths_to_process, buf_path)
     end
   end
 
-  if #context_parts > 0 then
-    return clean_prompt, table.concat(context_parts, "\n")
+  -- Now, process all the paths we've collected
+  for _, path in ipairs(paths_to_process) do
+    local content, err = read_path_content(path)
+    if content then
+      -- Add a clear header so the AI knows which file the context belongs to
+      table.insert(context_blocks, "--- Context from file: " .. path .. " ---\n" .. content .. "\n--- End of Context ---")
+    elseif err then
+      vim.notify(err, vim.log.levels.WARN, { title = "AI Assistant" })
+    end
+  end
+
+  -- Trim whitespace from the final prompt
+  clean_prompt = clean_prompt:gsub("^%s+", ""):gsub("%s+$", "")
+
+  if #context_blocks > 0 then
+    return clean_prompt, table.concat(context_blocks, "\n\n")
   end
 
   return clean_prompt, nil
