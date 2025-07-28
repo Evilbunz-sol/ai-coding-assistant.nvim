@@ -11,6 +11,7 @@ local state = {
   input_win = nil,
   input_buf = nil,
   conversation = {},
+  last_active_bufnr = nil,
 }
 
 local open_sidebar
@@ -120,7 +121,7 @@ submit_input = function()
   if not input or input == "" then return end
 
   vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { "" })
-  local clean_prompt, context_block = context.parse(input)
+  local clean_prompt, context_block = context.parse(input, state.last_active_bufnr)
 
   table.insert(state.conversation, "👤 **You**")
   table.insert(state.conversation, clean_prompt)
@@ -179,6 +180,8 @@ open_sidebar = function()
     vim.api.nvim_set_current_win(state.input_win or state.chat_win)
     return
   end
+  state.last_active_bufnr = vim.api.nvim_get_current_buf()
+
   local bottom_padding = 3
   local sidebar_height = vim.o.lines - bottom_padding
   state.chat_buf = vim.api.nvim_create_buf(false, true)
@@ -192,6 +195,7 @@ open_sidebar = function()
     relative = 'editor', width = width, height = 1, row = sidebar_height - 2,
     col = vim.o.columns - width, style = 'minimal', border = 'single', noautocmd = true,
   })
+
   vim.api.nvim_win_set_option(state.chat_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal')
   vim.api.nvim_win_set_option(state.input_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder')
   vim.api.nvim_set_hl(0, "AICodeBlock", { bg = "#2E3440" }) -- Defines the background color

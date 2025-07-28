@@ -35,39 +35,31 @@ local function read_path_content(path)
 end
 
 -- The parse function
-function M.parse(input_prompt)
+function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' argument
   local context_parts = {}
   local prompt_words = vim.split(input_prompt, "%s+")
   local final_prompt_words = {}
   local paths_to_process = {}
-  local paths_processed = {} -- To avoid duplicates
+  local paths_processed = {}
 
+  -- (The first part of the function parsing @-mentions and paths remains exactly the same)
   local path_word_count = 0
-  -- First, check for leading file paths
   for i, word in ipairs(prompt_words) do
     if vim.fn.filereadable(word) == 1 or vim.fn.isdirectory(word) == 1 then
       table.insert(paths_to_process, word)
       path_word_count = i
     else
-      break -- Stop as soon as we hit a non-path word
+      break
     end
   end
-
-  -- The rest of the words form the main prompt
   for i = path_word_count + 1, #prompt_words do
     table.insert(final_prompt_words, prompt_words[i])
   end
-
   local clean_prompt = table.concat(final_prompt_words, " ")
-
-  -- Second, find any @-mentions in the remaining prompt
   for path in clean_prompt:gmatch("@([%w_./-]+)") do
     table.insert(paths_to_process, path)
-    -- Remove the @-mention from the final prompt text
-    clean_prompt = clean_prompt:gsub("@" .. path, path)
+    clean_prompt = clean_prompt:gsub("@" .. path, "")
   end
-
-  -- Process all collected paths
   for _, path in ipairs(paths_to_process) do
     if not paths_processed[path] then
       local content, err = read_path_content(path)
@@ -82,21 +74,20 @@ function M.parse(input_prompt)
     end
   end
 
-  
- -- If after all that, we still have no context, default to the current buffer.
- if #context_parts == 0 then
-   local current_buf_path = vim.api.nvim_buf_get_name(0) -- 0 is the current buffer
-   if current_buf_path and current_buf_path ~= "" then
-     local content, err = read_path_content(current_buf_path)
-     if content then
-       table.insert(context_parts, "--- Context from: " .. current_buf_path .. " ---\n")
-       table.insert(context_parts, content)
-       table.insert(context_parts, "\n--- End of Context ---\n")
-     else
-       vim.notify(err, vim.log.levels.WARN, { title = "AI Assistant" })
-     end
-   end
- end
+  -- If no explicit paths were found, use the default buffer passed from the sidebar.
+  if #context_parts == 0 and default_bufnr then
+    local buf_path = vim.api.nvim_buf_get_name(default_bufnr)
+    if buf_path and buf_path ~= "" then
+      local content, err = read_path_content(buf_path)
+      if content then
+        table.insert(context_parts, "--- Context from: " .. buf_path .. " ---\n")
+        table.insert(context_parts, content)
+        table.insert(context_parts, "\n--- End of Context ---\n")
+      elseif err then
+        vim.notify(err, vim.log.levels.WARN, { title = "AI Assistant" })
+      end
+    end
+  end
 
   if #context_parts > 0 then
     return clean_prompt, table.concat(context_parts, "\n")
