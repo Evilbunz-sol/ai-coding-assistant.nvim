@@ -2,8 +2,12 @@ local M = {}
 
 local ns = vim.api.nvim_create_namespace("ai_assistant_diff")
 
+-- We'll make the highlight definitions more explicit
 local function setup_highlights()
+  -- For deleted lines, we want a red background for the whole line
   vim.api.nvim_set_hl(0, "AIDiffDelete", { bg = "#4C383F" })
+
+  -- For added virtual text, we want a green background
   vim.api.nvim_set_hl(0, "AIDiffAdd", { bg = "#2E4842" })
 end
 
@@ -22,30 +26,23 @@ function M.apply(parsed_diff)
 
   M.clear(target_bufnr)
 
+  -- Find the window associated with the buffer to get its width
   local target_win_id = vim.fn.bufwinid(target_bufnr)
-  local win_width
-  if target_win_id == -1 then
-    win_width = vim.o.columns  -- Fallback to editor width if buffer not visible
-  else
-    win_width = vim.api.nvim_win_get_width(target_win_id)
-  end
-
-  local buf_line_count = vim.api.nvim_buf_line_count(target_bufnr)
+  local win_width = vim.api.nvim_win_get_width(target_win_id)
 
   local current_line_in_buffer = 0
   for _, hunk in ipairs(parsed_diff.hunks) do
     current_line_in_buffer = hunk.original_start_line - 1
-    -- Clamp to valid range (0 to buf_line_count for appends)
-    current_line_in_buffer = math.max(0, math.min(current_line_in_buffer, buf_line_count))
 
     for _, change in ipairs(hunk.changes) do
       if change.type == "delete" then
+        --> CHANGED: Use 'line_hl_group' to highlight the entire line.
         vim.api.nvim_buf_set_extmark(target_bufnr, ns, current_line_in_buffer, 0, {
           line_hl_group = "AIDiffDelete",
         })
         current_line_in_buffer = current_line_in_buffer + 1
-        current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count)
       elseif change.type == "add" then
+        --> CHANGED: Pad the virtual text with spaces to simulate a full-line highlight.
         local content = change.content
         local padding = win_width - #content
         local padded_content = content .. string.rep(" ", padding > 0 and padding or 0)
@@ -54,32 +51,8 @@ function M.apply(parsed_diff)
           virt_lines = { { { padded_content, "AIDiffAdd" } } },
           virt_lines_above = false,
         })
-        -- For adds, optionally increment if you want stacked adds on separate lines
-        -- current_line_in_buffer = current_line_in_buffer + 1  -- Uncomment if needed
       elseif change.type == "context" then
         current_line_in_buffer = current_line_in_buffer + 1
-        current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count)
-      end
-    end
-  end
-end
-
-return Murrent_line_in_buffer = current_line_in_buffer + 1
-        -- Clamp again if needed
-        current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count - 1)
-      elseif change.type == "add" then
-        local content = change.content
-        local padding = win_width - #content
-        local padded_content = content .. string.rep(" ", padding > 0 and padding or 0)
-
-        vim.api.nvim_buf_set_extmark(target_bufnr, ns, current_line_in_buffer, 0, {
-          virt_lines = { { { padded_content, "AIDiffAdd" } } },
-          virt_lines_above = false,
-        })
-        -- Don't increment for adds (virtual), but if next change is add, it stacks on same line—consider incrementing if multiple adds
-      elseif change.type == "context" then
-        current_line_in_buffer = current_line_in_buffer + 1
-        current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count - 1)
       end
     end
   end
