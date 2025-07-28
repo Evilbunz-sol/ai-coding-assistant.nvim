@@ -82,6 +82,22 @@ function M.parse(input_prompt)
     end
   end
 
+  
+ -- If after all that, we still have no context, default to the current buffer.
+ if #context_parts == 0 then
+   local current_buf_path = vim.api.nvim_buf_get_name(0) -- 0 is the current buffer
+   if current_buf_path and current_buf_path ~= "" then
+     local content, err = read_path_content(current_buf_path)
+     if content then
+       table.insert(context_parts, "--- Context from: " .. current_buf_path .. " ---\n")
+       table.insert(context_parts, content)
+       table.insert(context_parts, "\n--- End of Context ---\n")
+     else
+       vim.notify(err, vim.log.levels.WARN, { title = "AI Assistant" })
+     end
+   end
+ end
+
   if #context_parts > 0 then
     return clean_prompt, table.concat(context_parts, "\n")
   end
@@ -90,3 +106,6 @@ function M.parse(input_prompt)
 end
 
 return M
+
+
+
