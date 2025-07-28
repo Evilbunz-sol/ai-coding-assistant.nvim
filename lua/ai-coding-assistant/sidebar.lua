@@ -1,6 +1,7 @@
 local context = require("ai-coding-assistant.context")
 local diff = require("ai-coding-assistant.diff")
 local highlighter = require("ai-coding-assistant.highlighter")
+local applier = require("ai-coding-assistant.applier")
 
 local M = {}
 
@@ -46,6 +47,7 @@ render_conversation = function()
   vim.api.nvim_win_set_cursor(state.chat_win, { #lines_to_render, 0 })
 end
 
+
 handle_input_change = function()
   local line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
   local trigger = line:match "@$"
@@ -72,6 +74,7 @@ handle_input_change = function()
   end
 end
 
+
 submit_input = function()
   if not state.input_buf then return end
 
@@ -90,33 +93,32 @@ submit_input = function()
 
   local core = require("ai-coding-assistant.core")
 
-  --> THIS IS THE NEW, SAFER CALLBACK LOGIC
   core.request(clean_prompt, context_block, function(response)
-    -- Find the index of our "Thinking..." placeholder. It's always the last item.
     local thinking_index = #state.conversation
-
     local parsed_diff, err = diff.parse(response)
 
     if parsed_diff then
-      -- If a diff was found, replace "Thinking..." with the explanation text.
+      -- A valid diff was found!
       local explanation = response:match("^(.-)```diff") or "Here are the proposed changes:"
       state.conversation[thinking_index] = explanation:gsub("^%s*", ""):gsub("%s*$", "")
 
-      -- Apply the highlights to the code file.
       highlighter.apply(parsed_diff)
 
-      -- Add a new confirmation message to the chat.
-      table.insert(state.conversation, "") -- Add a blank line for spacing
-      table.insert(state.conversation, "*Changes have been highlighted in the source file.*")
+      -- Add the interactive prompt to the chat.
+      table.insert(state.conversation, "") -- blank line for spacing
+      table.insert(state.conversation, "*Changes highlighted. In this window, press 'a' to apply or 'x' to reject.*")
+
+      -- Activate the keymaps
+      setup_diff_actions(parsed_diff)
+
     elseif err then
-      -- If parsing failed, replace "Thinking..." with an error message.
+      -- Parsing failed
       state.conversation[thinking_index] = "Error parsing diff: " .. err
     else
-      -- If no diff was found, replace "Thinking..." with the normal response.
+      -- No diff was found in the response
       state.conversation[thinking_index] = response
     end
 
-    -- Re-render the chat window with the final content.
     render_conversation()
   end)
 end
@@ -174,5 +176,41 @@ M.toggle = function()
     open_sidebar()
   end
 end
+
+
+---------------- KEYMAPS --------------
+local function setup_diff_actions(parsed_diff)
+  -- A cleanup function to remove the keymaps when we're done.
+  local function cleanup_diff_actions()
+    vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'a')
+    vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'x')
+  end
+
+  -- Define what happens when the user presses 'a' (Apply)
+  local function on_apply()
+    cleanup_diff_actions()
+    applier.apply(parsed_diff)
+    -- Update the chat message to confirm the action
+    table.insert(state.conversation, "*✅ Changes applied.*")
+    render_conversation()
+  end
+
+  -- Define what happens when the user presses 'x' (Reject)
+  local function on_reject()
+    cleanup_diff_actions()
+    local target_bufnr = vim.fn.bufnr(parsed_diff.file_path, true)
+    if target_bufnr ~= -1 then
+      highlighter.clear(target_bufnr)
+    end
+    -- Update the chat message to confirm the action
+    table.insert(state.conversation, "*❌ Changes rejected.*")
+    render_conversation()
+  end
+
+  vim.keymap.set('n', 'a', on_apply, { buffer = state.chat_buf, silent = true, desc = "Apply AI Diff" })
+  vim.keymap.set('n', 'x', on_reject, { buffer = state.chat_buf, silent = true, desc = "Reject AI Diff" })
+end
+
+
 
 return M
