@@ -62,9 +62,12 @@ function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' ar
   -- Second, find any @-mentions in the remaining prompt
   for path in clean_prompt:gmatch("@([%w_./-]+)") do
     table.insert(paths_to_process, path)
-    -- Clean the @-mention from the prompt text for clarity
-    clean_prompt = clean_prompt:gsub("@" .. path, ""):gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
+    -- Fix: Replace "@path" with "path" to keep the filename in the prompt but remove @
+    clean_prompt = clean_prompt:gsub("@" .. path, path)
   end
+
+  -- Trim any extra spaces from clean_prompt
+  clean_prompt = clean_prompt:gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
 
   -- Process all collected explicit paths
   for _, path in ipairs(paths_to_process) do
@@ -81,10 +84,10 @@ function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' ar
     end
   end
 
-  -- ⭐️ CHANGE: If no explicit paths were found, use the default buffer.
+  -- If no explicit paths were found, use the default buffer if valid and named
   if #paths_to_process == 0 and default_bufnr and vim.api.nvim_buf_is_valid(default_bufnr) then
     local buf_path = vim.api.nvim_buf_get_name(default_bufnr)
-    if buf_path and buf_path ~= "" then
+    if buf_path and buf_path ~= "" and vim.fn.filereadable(buf_path) == 1 then
       local content, err = read_path_content(buf_path)
       if content then
         table.insert(context_parts, "--- Context from: " .. buf_path .. " ---\n")
@@ -104,6 +107,3 @@ function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' ar
 end
 
 return M
-
-
-
