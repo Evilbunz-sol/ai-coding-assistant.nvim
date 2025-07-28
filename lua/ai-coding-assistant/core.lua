@@ -6,7 +6,6 @@ M.state = {
   current = {},
 }
 
---> THE FUNCTION NOW ACCEPTS A 'context' ARGUMENT
 function M.request(prompt, context, callback)
   local config = require("ai-coding-assistant.config").get()
   local state = require("ai-coding-assistant.core").state
@@ -26,38 +25,45 @@ function M.request(prompt, context, callback)
     return
   end
 
-  --> NEW: This is the updated system prompt.
-  local system_prompt = "You are an expert code assistant. First, provide a concise explanation of your proposed changes. After your explanation, on a new line, provide only the code changes in the unified diff format, enclosed in a markdown code block (```diff). Do not include any other text after the diff block."
+  -- ⭐️ NEW, MORE ROBUST SYSTEM PROMPT
+  local system_prompt = [[
+You are an expert pair programmer integrated into Neovim. Follow these rules strictly:
+1.  Your primary goal is to generate a single, valid unified diff for the requested change.
+2.  The user's code will be provided as context, prefixed with '--- Context from file: ...'. Pay close attention to this file path.
+3.  Your response MUST start with a brief, one-sentence explanation of the change.
+4.  After the explanation, you MUST provide the code changes in a single markdown block using the unified diff format, like so: ```diff ... ```.
+5.  The diff MUST contain the correct file path header (e.g., '--- a/path/to/file.ts').
+6.  The line numbers in the diff (e.g., '@@ -1,5 +1,6 @@') MUST accurately match the provided context.
+7.  **SPECIAL CASE: If the file context is empty, you are creating new content. Your diff MUST start with '@@ -0,0 +1,N @@' where N is the number of lines you are adding.**
+8.  Do not include any other text, conversation, or apologies after the diff block.
+]]
 
   local final_prompt
   if context then
-    final_prompt = "System instruction: " .. system_prompt ..
-                     "\n\nGiven the following context from the codebase:\n\n" .. context ..
-                     "\n\nPlease perform the following task:\n\n" .. prompt
+    final_prompt = "System instruction:\n" .. system_prompt ..
+                      "\n\nGiven the following context from the codebase:\n" .. context ..
+                      "\n\nPlease perform the following task:\n\n" .. prompt
   else
-    final_prompt = "System instruction: " .. system_prompt ..
-                     "\n\nPlease perform the following task:\n\n" .. prompt
+    -- Added a case for no context, still providing the system prompt
+    final_prompt = "System instruction:\n" .. system_prompt ..
+                      "\n\nThe user provided no file context. Based on the request, generate a new file content block." ..
+                      "\n\nPlease perform the following task:\n\n" .. prompt
   end
 
-  -- The rest of the function remains the same.
   local payload = provider.build_payload(model_name, final_prompt)
   local payload_json = vim.json.encode(payload)
   local provider_url = provider.url
   local curl_args = { "-s", "-X", "POST", provider_url, "-d", payload_json }
 
   if provider_name == "openai" then
-    table.insert(curl_args, "-H")
-    table.insert(curl_args, "Authorization: Bearer " .. api_key)
+    table.insert(curl_args, "-H"); table.insert(curl_args, "Authorization: Bearer " .. api_key)
   elseif provider_name == "anthropic" then
-    table.insert(curl_args, "-H")
-    table.insert(curl_args, "x-api-key: " .. api_key)
-    table.insert(curl_args, "-H")
-    table.insert(curl_args, "anthropic-version: 2023-06-01")
+    table.insert(curl_args, "-H"); table.insert(curl_args, "x-api-key: " .. api_key)
+    table.insert(curl_args, "-H"); table.insert(curl_args, "anthropic-version: 2023-06-01")
   elseif provider_name == "gemini" then
     curl_args[4] = provider_url .. "?key=" .. api_key
   end
-  table.insert(curl_args, "-H")
-  table.insert(curl_args, "Content-Type: application/json")
+  table.insert(curl_args, "-H"); table.insert(curl_args, "Content-Type: application/json")
 
   Job:new({
     command = "curl",
@@ -80,9 +86,7 @@ function M.request(prompt, context, callback)
       end
       local content = provider.parse_response(response_json)
       if content then
-        vim.schedule(function()
-          callback(content)
-        end)
+        vim.schedule(function() callback(content) end)
       else
         vim.notify("AI response format was unexpected: " .. response_body, vim.log.levels.WARN)
       end

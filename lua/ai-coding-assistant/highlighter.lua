@@ -31,13 +31,18 @@ function M.apply(parsed_diff)
 
   local line_cursor = 0
   for _, hunk in ipairs(parsed_diff.hunks) do
-    line_cursor = hunk.original_start_line - 1
+    line_cursor = hunk.original_start_line
 
-    if line_cursor < 0 or line_cursor > line_count then
+    -- ⭐️ MORE PRECISE SAFETY CHECK
+    -- The start line of a diff is 1-indexed. The number of lines is also 1-indexed.
+    -- A hunk cannot start *after* the last line of the file.
+    if line_cursor > line_count + 1 then
       vim.notify("AI returned a diff with invalid line numbers for " .. parsed_diff.file_path, vim.log.levels.WARN)
-      -- Continue to the next hunk, as it might be valid
       goto continue
     end
+
+    -- The line cursor is now 0-indexed for API calls
+    line_cursor = line_cursor - 1
 
     for _, change in ipairs(hunk.changes) do
       if change.type == "-" then
@@ -46,9 +51,8 @@ function M.apply(parsed_diff)
         end
         line_cursor = line_cursor + 1
       elseif change.type == "+" then
-        local padded_content = change.content .. string.rep(" ", win_width - #change.content)
-        -- We place the 'add' highlight at the line *before* the addition would occur.
         local display_line = math.max(0, line_cursor - 1)
+        local padded_content = change.content .. string.rep(" ", math.max(0, win_width - #change.content))
         vim.api.nvim_buf_set_extmark(target_bufnr, ns, display_line, 0, {
           virt_lines = { { { padded_content, "AIDiffAdd" } } },
           virt_lines_above = false,
