@@ -19,6 +19,41 @@ local submit_input
 local render_conversation
 local handle_input_change
 
+
+---------------- KEYMAPS --------------
+local function setup_diff_actions(parsed_diff)
+  -- A cleanup function to remove the keymaps when we're done.
+  local function cleanup_diff_actions()
+    vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'a')
+    vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'x')
+  end
+
+  -- Define what happens when the user presses 'a' (Apply)
+  local function on_apply()
+    cleanup_diff_actions()
+    applier.apply(parsed_diff)
+    -- Update the chat message to confirm the action
+    table.insert(state.conversation, "*✅ Changes applied.*")
+    render_conversation()
+  end
+
+  -- Define what happens when the user presses 'x' (Reject)
+  local function on_reject()
+    cleanup_diff_actions()
+    local target_bufnr = vim.fn.bufnr(parsed_diff.file_path, true)
+    if target_bufnr ~= -1 then
+      highlighter.clear(target_bufnr)
+    end
+    -- Update the chat message to confirm the action
+    table.insert(state.conversation, "*❌ Changes rejected.*")
+    render_conversation()
+  end
+
+  vim.keymap.set('n', 'a', on_apply, { buffer = state.chat_buf, silent = true, desc = "Apply AI Diff" })
+  vim.keymap.set('n', 'x', on_reject, { buffer = state.chat_buf, silent = true, desc = "Reject AI Diff" })
+end
+
+---------------- Render Conversation --------------
 render_conversation = function()
   if not state.chat_buf or not vim.api.nvim_buf_is_valid(state.chat_buf) then return end
   local lines_to_render = {}
@@ -75,6 +110,8 @@ handle_input_change = function()
 end
 
 
+
+---------------- Submit Input --------------
 submit_input = function()
   if not state.input_buf then return end
 
@@ -123,6 +160,8 @@ submit_input = function()
   end)
 end
 
+
+---------------- Open/Close Sidebar --------------
 close_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     vim.api.nvim_win_close(state.chat_win, true)
@@ -132,6 +171,7 @@ close_sidebar = function()
   end
   state = { chat_win = nil, chat_buf = nil, input_win = nil, input_buf = nil, conversation = {} }
 end
+
 
 open_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
@@ -176,41 +216,6 @@ M.toggle = function()
     open_sidebar()
   end
 end
-
-
----------------- KEYMAPS --------------
-local function setup_diff_actions(parsed_diff)
-  -- A cleanup function to remove the keymaps when we're done.
-  local function cleanup_diff_actions()
-    vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'a')
-    vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'x')
-  end
-
-  -- Define what happens when the user presses 'a' (Apply)
-  local function on_apply()
-    cleanup_diff_actions()
-    applier.apply(parsed_diff)
-    -- Update the chat message to confirm the action
-    table.insert(state.conversation, "*✅ Changes applied.*")
-    render_conversation()
-  end
-
-  -- Define what happens when the user presses 'x' (Reject)
-  local function on_reject()
-    cleanup_diff_actions()
-    local target_bufnr = vim.fn.bufnr(parsed_diff.file_path, true)
-    if target_bufnr ~= -1 then
-      highlighter.clear(target_bufnr)
-    end
-    -- Update the chat message to confirm the action
-    table.insert(state.conversation, "*❌ Changes rejected.*")
-    render_conversation()
-  end
-
-  vim.keymap.set('n', 'a', on_apply, { buffer = state.chat_buf, silent = true, desc = "Apply AI Diff" })
-  vim.keymap.set('n', 'x', on_reject, { buffer = state.chat_buf, silent = true, desc = "Reject AI Diff" })
-end
-
 
 
 return M
