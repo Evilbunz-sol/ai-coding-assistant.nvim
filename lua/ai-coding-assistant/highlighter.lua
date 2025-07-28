@@ -22,11 +22,10 @@ function M.apply(parsed_diff)
 
   M.clear(target_bufnr)
 
-  -- Fix: Handle if buffer not visible in any window
   local target_win_id = vim.fn.bufwinid(target_bufnr)
   local win_width
   if target_win_id == -1 then
-    win_width = vim.o.columns  -- Fallback to editor width
+    win_width = vim.o.columns  -- Fallback to editor width if buffer not visible
   else
     win_width = vim.api.nvim_win_get_width(target_win_id)
   end
@@ -36,8 +35,8 @@ function M.apply(parsed_diff)
   local current_line_in_buffer = 0
   for _, hunk in ipairs(parsed_diff.hunks) do
     current_line_in_buffer = hunk.original_start_line - 1
-    -- Fix: Clamp to valid range
-    current_line_in_buffer = math.max(0, math.min(current_line_in_buffer, buf_line_count - 1))
+    -- Clamp to valid range (0 to buf_line_count for appends)
+    current_line_in_buffer = math.max(0, math.min(current_line_in_buffer, buf_line_count))
 
     for _, change in ipairs(hunk.changes) do
       if change.type == "delete" then
@@ -45,6 +44,27 @@ function M.apply(parsed_diff)
           line_hl_group = "AIDiffDelete",
         })
         current_line_in_buffer = current_line_in_buffer + 1
+        current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count)
+      elseif change.type == "add" then
+        local content = change.content
+        local padding = win_width - #content
+        local padded_content = content .. string.rep(" ", padding > 0 and padding or 0)
+
+        vim.api.nvim_buf_set_extmark(target_bufnr, ns, current_line_in_buffer, 0, {
+          virt_lines = { { { padded_content, "AIDiffAdd" } } },
+          virt_lines_above = false,
+        })
+        -- For adds, optionally increment if you want stacked adds on separate lines
+        -- current_line_in_buffer = current_line_in_buffer + 1  -- Uncomment if needed
+      elseif change.type == "context" then
+        current_line_in_buffer = current_line_in_buffer + 1
+        current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count)
+      end
+    end
+  end
+end
+
+return Murrent_line_in_buffer = current_line_in_buffer + 1
         -- Clamp again if needed
         current_line_in_buffer = math.min(current_line_in_buffer, buf_line_count - 1)
       elseif change.type == "add" then
