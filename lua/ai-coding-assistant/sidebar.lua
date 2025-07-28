@@ -130,7 +130,7 @@ submit_input = function()
     local parsed_diff, err = diff.parse(response)
 
     if parsed_diff then
-      local explanation = response:match("^(.-)```diff
+     local explanation = response:match("^(.-)```diff"
       state.conversation[thinking_index] = explanation:gsub("^%s*", ""):gsub("%s*$", "")
       highlighter.apply(parsed_diff)
       table.insert(state.conversation, "")
