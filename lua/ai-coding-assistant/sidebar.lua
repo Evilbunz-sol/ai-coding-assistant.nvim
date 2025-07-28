@@ -1,3 +1,4 @@
+-- lua/ai-coding-assistant/sidebar.lua
 local context = require("ai-coding-assistant.context")
 local diff = require("ai-coding-assistant.diff")
 local highlighter = require("ai-coding-assistant.highlighter")
@@ -5,6 +6,7 @@ local applier = require("ai-coding-assistant.applier")
 
 local M = {}
 
+-- Add last_active_bufnr to the state table
 local state = {
   chat_win = nil,
   chat_buf = nil,
@@ -21,32 +23,26 @@ local render_conversation
 local handle_input_change
 local setup_diff_actions
 
-
----------------- KEYMAPS --------------
+-- This function remains the same
 setup_diff_actions = function(parsed_diff)
-  -- A cleanup function to remove the keymaps when we're done.
   local function cleanup_diff_actions()
     vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'a')
     vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'x')
   end
 
-  -- Define what happens when the user presses 'a' (Apply)
   local function on_apply()
     cleanup_diff_actions()
     applier.apply(parsed_diff)
-    -- Update the chat message to confirm the action
     table.insert(state.conversation, "*✅ Changes applied.*")
     render_conversation()
   end
 
-  -- Define what happens when the user presses 'x' (Reject)
   local function on_reject()
     cleanup_diff_actions()
     local target_bufnr = vim.fn.bufnr(parsed_diff.file_path, true)
     if target_bufnr ~= -1 then
       highlighter.clear(target_bufnr)
     end
-    -- Update the chat message to confirm the action
     table.insert(state.conversation, "*❌ Changes rejected.*")
     render_conversation()
   end
@@ -55,7 +51,7 @@ setup_diff_actions = function(parsed_diff)
   vim.keymap.set('n', 'x', on_reject, { buffer = state.chat_buf, silent = true, desc = "Reject AI Diff" })
 end
 
----------------- Render Conversation --------------
+-- This function remains the same
 render_conversation = function()
   if not state.chat_buf or not vim.api.nvim_buf_is_valid(state.chat_buf) then return end
   local lines_to_render = {}
@@ -84,11 +80,10 @@ render_conversation = function()
   vim.api.nvim_win_set_cursor(state.chat_win, { #lines_to_render, 0 })
 end
 
-
+-- This function remains the same
 handle_input_change = function()
   local line = vim.api.nvim_buf_get_lines(state.input_buf, 0, -1, false)[1] or ""
-  local trigger = line:match "@$"
-  if trigger then
+  if line:match "@$" then
     vim.cmd.stopinsert()
     vim.schedule(function()
       require("telescope.builtin").find_files({
@@ -111,9 +106,7 @@ handle_input_change = function()
   end
 end
 
-
-
----------------- Submit Input --------------
+-- Pass the saved buffer to the context parser
 submit_input = function()
   if not state.input_buf then return end
 
@@ -121,6 +114,7 @@ submit_input = function()
   if not input or input == "" then return end
 
   vim.api.nvim_buf_set_lines(state.input_buf, 0, -1, false, { "" })
+  -- ⭐️ CHANGE: Pass the saved buffer number to the context parser
   local clean_prompt, context_block = context.parse(input, state.last_active_bufnr)
 
   table.insert(state.conversation, "👤 **You**")
@@ -137,24 +131,15 @@ submit_input = function()
     local parsed_diff, err = diff.parse(response)
 
     if parsed_diff then
-      -- A valid diff was found!
       local explanation = response:match("^(.-)```diff") or "Here are the proposed changes:"
       state.conversation[thinking_index] = explanation:gsub("^%s*", ""):gsub("%s*$", "")
-
       highlighter.apply(parsed_diff)
-
-      -- Add the interactive prompt to the chat.
-      table.insert(state.conversation, "") -- blank line for spacing
-      table.insert(state.conversation, "*Changes highlighted. In this window, press 'a' to apply or 'x' to reject.*")
-
-      -- Activate the keymaps
+      table.insert(state.conversation, "")
+      table.insert(state.conversation, "*Changes highlighted. Press 'a' to apply or 'x' to reject.*")
       setup_diff_actions(parsed_diff)
-
     elseif err then
-      -- Parsing failed
       state.conversation[thinking_index] = "Error parsing diff: " .. err
     else
-      -- No diff was found in the response
       state.conversation[thinking_index] = response
     end
 
@@ -162,8 +147,7 @@ submit_input = function()
   end)
 end
 
-
----------------- Open/Close Sidebar --------------
+-- This function remains the same
 close_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     vim.api.nvim_win_close(state.chat_win, true)
@@ -171,15 +155,18 @@ close_sidebar = function()
   if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
     vim.api.nvim_win_close(state.input_win, true)
   end
-  state = { chat_win = nil, chat_buf = nil, input_win = nil, input_buf = nil, conversation = {} }
+  -- Reset the entire state on close
+  state = { chat_win = nil, chat_buf = nil, input_win = nil, input_buf = nil, conversation = {}, last_active_bufnr = nil }
 end
 
-
+-- Capture the buffer handle when opening the sidebar
 open_sidebar = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     vim.api.nvim_set_current_win(state.input_win or state.chat_win)
     return
   end
+
+  -- ⭐️ CHANGE: Right before creating windows, save the current buffer handle
   state.last_active_bufnr = vim.api.nvim_get_current_buf()
 
   local bottom_padding = 3
@@ -198,18 +185,21 @@ open_sidebar = function()
 
   vim.api.nvim_win_set_option(state.chat_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal')
   vim.api.nvim_win_set_option(state.input_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder')
-  vim.api.nvim_set_hl(0, "AICodeBlock", { bg = "#2E3440" }) -- Defines the background color
+  vim.api.nvim_set_hl(0, "AICodeBlock", { bg = "#2E3440" })
   vim.api.nvim_buf_set_option(state.chat_buf, 'filetype', 'markdown')
   vim.api.nvim_buf_set_option(state.chat_buf, 'modifiable', false)
   vim.api.nvim_win_set_option(state.chat_win, 'wrap', true)
+
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.chat_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('n', 'i', function() vim.api.nvim_set_current_win(state.input_win) vim.cmd('startinsert') end, { buffer = state.chat_buf, silent = true, desc = "Focus Input" })
   vim.keymap.set('i', '<CR>', submit_input, { buffer = state.input_buf, silent = true, desc = "Submit to AI" })
   vim.keymap.set('n', 'q', close_sidebar, { buffer = state.input_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('i', '<Esc>', function() vim.api.nvim_set_current_win(state.chat_win) end, { buffer = state.input_buf, silent = true, desc = "Focus Chat" })
   vim.api.nvim_create_autocmd("TextChangedI", { buffer = state.input_buf, callback = handle_input_change })
+
   vim.api.nvim_set_current_win(state.input_win)
   vim.cmd('startinsert')
+
   state.conversation = { "# AI Chat", "Type your message below and press Enter." }
   render_conversation()
 end
@@ -221,6 +211,5 @@ M.toggle = function()
     open_sidebar()
   end
 end
-
 
 return M

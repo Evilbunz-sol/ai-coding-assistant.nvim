@@ -42,7 +42,7 @@ function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' ar
   local paths_to_process = {}
   local paths_processed = {}
 
-  -- (The first part of the function parsing @-mentions and paths remains exactly the same)
+  -- First, parse any leading file paths
   local path_word_count = 0
   for i, word in ipairs(prompt_words) do
     if vim.fn.filereadable(word) == 1 or vim.fn.isdirectory(word) == 1 then
@@ -52,14 +52,21 @@ function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' ar
       break
     end
   end
+
+  -- The rest of the words form the main prompt text
   for i = path_word_count + 1, #prompt_words do
     table.insert(final_prompt_words, prompt_words[i])
   end
   local clean_prompt = table.concat(final_prompt_words, " ")
+
+  -- Second, find any @-mentions in the remaining prompt
   for path in clean_prompt:gmatch("@([%w_./-]+)") do
     table.insert(paths_to_process, path)
-    clean_prompt = clean_prompt:gsub("@" .. path, "")
+    -- Clean the @-mention from the prompt text for clarity
+    clean_prompt = clean_prompt:gsub("@" .. path, ""):gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
   end
+
+  -- Process all collected explicit paths
   for _, path in ipairs(paths_to_process) do
     if not paths_processed[path] then
       local content, err = read_path_content(path)
@@ -74,8 +81,8 @@ function M.parse(input_prompt, default_bufnr) -- Note the new 'default_bufnr' ar
     end
   end
 
-  -- If no explicit paths were found, use the default buffer passed from the sidebar.
-  if #context_parts == 0 and default_bufnr then
+  -- ⭐️ CHANGE: If no explicit paths were found, use the default buffer.
+  if #paths_to_process == 0 and default_bufnr and vim.api.nvim_buf_is_valid(default_bufnr) then
     local buf_path = vim.api.nvim_buf_get_name(default_bufnr)
     if buf_path and buf_path ~= "" then
       local content, err = read_path_content(buf_path)
