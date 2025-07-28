@@ -18,10 +18,11 @@ local close_sidebar
 local submit_input
 local render_conversation
 local handle_input_change
+local setup_diff_actions
 
 
 ---------------- KEYMAPS --------------
-local function setup_diff_actions(parsed_diff)
+setup_diff_actions = function(parsed_diff)
   -- A cleanup function to remove the keymaps when we're done.
   local function cleanup_diff_actions()
     vim.api.nvim_buf_del_keymap(state.chat_buf, 'n', 'a')
