@@ -15,10 +15,13 @@ local state = {
 
 local close_sidebar, update_last_active_buffer
 
+-- ⭐️ THIS IS THE CORRECTED FUNCTION ⭐️
+-- It now correctly checks if the window being entered is part of the chat UI.
 update_last_active_buffer = function()
-  local current_win = vim.api.nvim_get_current_win()
-  if state.win_ids[current_win] == nil then
-    state.last_active_bufnr = vim.api.nvim_win_get_buf(current_win)
+  local current_win_id = vim.api.nvim_get_current_win()
+  -- Only update the active buffer if the new window is NOT our chat or input window.
+  if current_win_id ~= state.win_ids.chat_win and current_win_id ~= state.win_ids.input_win then
+    state.last_active_bufnr = vim.api.nvim_win_get_buf(current_win_id)
   end
 end
 
@@ -109,13 +112,12 @@ function M.render()
 end
 
 close_sidebar = function()
-  for _, win_or_buf_id in pairs(state.win_ids) do
-    if vim.api.nvim_win_is_valid(win_or_buf_id) then
-        pcall(vim.api.nvim_win_close, win_or_buf_id, true)
-    end
-  end
-  if state.autocmd_group then pcall(vim.api.nvim_del_augroup_by_id, state.autocmd_group) end
-  state = { win_ids = {}, autocmd_group = nil, last_active_bufnr = nil, conversation = {} }
+    -- Use pcall for safety in case a window is already closed
+    pcall(vim.api.nvim_win_close, state.win_ids.chat_win, true)
+    pcall(vim.api.nvim_win_close, state.win_ids.input_win, true)
+    if state.autocmd_group then pcall(vim.api.nvim_del_augroup_by_id, state.autocmd_group) end
+    -- Reset the state
+    state = { win_ids = {}, autocmd_group = nil, last_active_bufnr = nil, conversation = {} }
 end
 
 function M.toggle()
@@ -128,26 +130,20 @@ function M.toggle()
   state.autocmd_group = vim.api.nvim_create_augroup("AICompanionSidebarTracker", { clear = true })
   vim.api.nvim_create_autocmd("WinEnter", { group = state.autocmd_group, callback = update_last_active_buffer })
 
-  -- Your restored styling and layout logic
-  local bottom_padding = 3
-  local sidebar_height = vim.o.lines - bottom_padding
   local width = 60
-
   local chat_buf = vim.api.nvim_create_buf(false, true)
   local chat_win = vim.api.nvim_open_win(chat_buf, true, {
-    relative = 'editor', width = width, height = sidebar_height - 3, row = 0,
+    relative = 'editor', width = width, height = vim.o.lines - 3, row = 0,
     col = vim.o.columns - width, style = 'minimal', border = 'single',
   })
   local input_buf = vim.api.nvim_create_buf(false, true)
   local input_win = vim.api.nvim_open_win(input_buf, true, {
-    relative = 'editor', width = width, height = 1, row = sidebar_height - 2,
+    relative = 'editor', width = width, height = 1, row = vim.o.lines - 2,
     col = vim.o.columns - width, style = 'minimal', border = 'single', noautocmd = true,
   })
-  
-  -- Store all created IDs for proper management
+
   state.win_ids = { chat_win = chat_win, chat_buf = chat_buf, input_win = input_win, input_buf = input_buf }
-  
-  -- Apply your window and buffer options
+
   vim.api.nvim_win_set_option(chat_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder,CursorLine:Normal')
   vim.api.nvim_win_set_option(input_win, 'winhighlight', 'Normal:Normal,FloatBorder:FloatBorder')
   vim.api.nvim_set_hl(0, "AICodeBlock", { bg = "#2E3440" })
@@ -155,7 +151,6 @@ function M.toggle()
   vim.api.nvim_buf_set_option(chat_buf, 'modifiable', false)
   vim.api.nvim_win_set_option(chat_win, 'wrap', true)
 
-  -- Restore your specific keymaps
   vim.keymap.set('n', 'q', close_sidebar, { buffer = chat_buf, silent = true, desc = "Close Chat" })
   vim.keymap.set('n', 'i', function() vim.api.nvim_set_current_win(input_win) vim.cmd('startinsert') end, { buffer = chat_buf, silent = true, desc = "Focus Input" })
   vim.keymap.set('i', '<CR>', function() run_ai_job(vim.api.nvim_buf_get_lines(input_buf, 0, -1, false)[1]); vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {""}) end, { buffer = input_buf, silent = true, desc = "Submit to AI" })
